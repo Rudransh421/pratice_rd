@@ -19,7 +19,7 @@ const uploadOnCloudinary = async (localFilePath) => {
     }
     const uploadResult = await cloudinary.uploader
       .upload(
-        "https://res.cloudinary.com/demo/image/upload/getting-started/shoes.jpg",
+        localFilePath,
         {
           // public_id: "shoes",
           resource_type: "auto",
