@@ -1,4 +1,4 @@
-import express from "expres";
+import express from "express";
 
 import cors from "cors";
 
@@ -17,5 +17,10 @@ app.use(express.json())
 app.use(express.urlencoded({extended : true}))
 app.use(express.static('public'))
 app.use(cookieParser())
+
+import userRouter from "./routes/user.routes.js"; // Only Possible as export is default otherwise we gonna write [ import router from "./routes/user.routes.js"; ]
+
+
+app.use("/api/user", userRouter)
 
 export { app };
