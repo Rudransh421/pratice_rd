@@ -31,7 +31,7 @@ const userSchema = new Schema(
       type: String, // couldinary url
       required: true,
     },
-    CoverImage: {
+    coverImage: {
       type: String, // couldinary url
     },
     watchHistory: [
