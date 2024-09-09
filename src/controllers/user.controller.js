@@ -4,11 +4,12 @@ import { ApiError } from "../utils/ApiError.js";
 
 import { User } from "../models/user.models.js";
 
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { uploadOnCloudinary, deleteFromCloudinary } from "../utils/cloudinary.js";
 
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 import jwt from "jsonwebtoken";
+import { Subscription } from "../models/subscription.models.js";
 
 const generateAccessAndRefreshTokens = async (userId) => {
   try {
@@ -302,20 +303,37 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
   const avatarLocalPath = req.file?.path;
 
   if (!avatarLocalPath) {
-    throw new ApiError(400, "avatar file is missing ");
+    throw new ApiError(400, "Avatar file is missing");
   }
 
+  // Upload new avatar to Cloudinary
   const avatar = await uploadOnCloudinary(avatarLocalPath);
 
   if (!avatar.url) {
-    throw new ApiError(500, "error while uploading avatar");
+    throw new ApiError(500, "Error while uploading avatar");
   }
 
-  const user = await User.findByIdAndUpdate(req.user?._id, {
-    $set: {
-      avatar: avatar.url,
+  // Find the user and get the current avatar URL
+  let user = await User.findById(req.user?._id); // Use 'let' since it will be reassigned later
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Delete old avatar from Cloudinary if it exists
+  if (user.avatar) {
+    await deleteFromCloudinary(user.avatar);  // Call the new function to delete the old avatar
+  }
+
+  // Update user with the new avatar URL
+  user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: {
+        avatar: avatar.url,
+      },
     },
-  });
+    { new: true } // This option returns the updated user document
+  );
 
   return res
     .status(200)
@@ -346,6 +364,78 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, user, "coverImage update complete"));
 });
 
+const getUserChannelProfile = asyncHandler( async (req,res)=>{
+  const {username} = req.params;
+
+  if (!username?.trim()) {
+    throw new ApiError(400, "Uername is missing")
+  }
+
+  const channel = await User.aggregate([
+    {
+      $match:{
+        username: username?.toLowerCase()
+      }
+    },
+    {
+      $lookup:{
+        from: "subscriptions",
+        localField:"_id",
+        foreignField:"channel",
+        as: "subscribers"
+      }
+    },
+    {
+      $lookup:{
+        from: "subscriptions",
+        localField:"_id",
+        foreignField:"subscriber",
+        as: "subscriberedTo"
+      }
+    },
+    {
+      $addFields:{
+        subscribersCount:{
+          $size: "$subscribers"
+        },
+        channelSubscribedToCount:{
+          $size:"$subscriberedTo"
+        },
+        isSubscribed:{
+          $cond:{
+            if: {$in: [req.user?._id, "$subscribers.subscriber"]},
+            then: true,
+            else:false
+          }
+        }
+      }
+    },
+    {
+      $project:{
+        username:1,
+        fullname:1,
+        subscribersCount:1,
+        channelSubscribedToCount:1,
+        isSubscribed:1,
+        avatar:1,
+        coverImage:1,
+        email:1,
+
+      }
+    }
+  ])
+
+  if (!channel?.length) {
+    throw new ApiError(404,"channel does not exist")
+  }
+
+  return res
+  .status(200)
+  .json(
+    new ApiResponse(200, channel[0], "user channel fetched succesfully")
+  )
+})
+
 export {
   registerUser,
   loginUser,
@@ -356,4 +446,5 @@ export {
   updateAccountDetails,
   updateUserAvatar,
   updateUserCoverImage,
+  getUserChannelProfile,
 };
