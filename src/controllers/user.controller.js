@@ -12,7 +12,7 @@ import {
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 import jwt from "jsonwebtoken";
-import { Subscription } from "../models/subscription.models.js";
+
 import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async (userId) => {
